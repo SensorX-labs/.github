@@ -46,28 +46,25 @@ Các biến thành phần được bóc tách chi tiết như sau:
 
 $$ItemWeight_j = Quantity_j \times BasePrice_j$$
 
-
-
 *(Với $Quantity_j$ là số lượng yêu cầu và $BasePrice_j$ là đơn giá vốn nội bộ của mặt hàng $j$).*
-* **Biên lợi nhuận lịch sử ($AverageMargin_i$):** Tỷ suất sinh lời trung bình trong quá khứ tại danh mục $i$.
 
-$$AverageMargin_i = \begin{cases} \frac{TotalMarginAccumulated_i}{SuccessCount_i} & \text{nếu } SuccessCount_i > 0 \\ 0 & \text{nếu } SuccessCount_i = 0 \end{cases}$$
+* **Biên lợi nhuận lịch sử chuẩn hóa ($\widetilde{AverageMargin}_i$):** Tỷ suất sinh lời trung bình trong quá khứ tại danh mục $i$. Nhằm đảm bảo tính ổn định toán học, bảo vệ mô hình khỏi các dữ liệu tồn dư hoặc dữ liệu mẫu sai lệch đơn vị (như lưu dạng số phần trăm nguyên nguyên thể thay vì số thực tỷ lệ), hệ thống áp dụng bộ tiền xử lý và nắn dòng dữ liệu lịch sử về không gian giải tích chuẩn $[0, 1]$:
 
+$$AverageMargin_i^{thô} = \begin{cases} \frac{TotalMarginAccumulated_i}{SuccessCount_i} & \text{nếu } SuccessCount_i > 0 \\ 0 & \text{nếu } SuccessCount_i = 0 \end{cases}$$
 
+$$\widetilde{AverageMargin}_i = \begin{cases} \frac{AverageMargin_i^{thô}}{100} & \text{nếu } AverageMargin_i^{thô} > 1.0 \\ AverageMargin_i^{thô} & \text{nếu } AverageMargin_i^{thô} \le 1.0 \end{cases}$$
 
 *(Với $i = c(j)$, $TotalMarginAccumulated_i$ là tổng biên lợi nhuận tích lũy từ các báo giá thành công và $SuccessCount_i$ là tổng số báo giá được khách hàng chấp nhận tại danh mục $i$).*
+
 * **Xác suất khách hàng chấp nhận báo giá ($Probability_i$):** Cân bằng giữa Khai thác và Khám phá bằng thuật toán Thompson Sampling.
 
 $$Probability_i = \text{Beta.Sample}(SuccessCount_i + 1,\ FailureCount_i + 1)$$
 
-
-
 *(Với $\text{Beta.Sample}$ là hàm lấy mẫu ngẫu nhiên từ phân phối Beta; $FailureCount_i$ là tổng số báo giá bị khách hàng từ chối tại danh mục $i$).*
-* **Điểm hiệu suất kỳ vọng ($ExpectedPerformanceScore_i$):** Tích hợp xác suất và hiệu quả kinh tế của nhân sự tại danh mục $i$.
 
-$$ExpectedPerformanceScore_i = Probability_i \times (1 + AverageMargin_i)$$
+* **Điểm hiệu suất kỳ vọng ($ExpectedPerformanceScore_i$):** Tích hợp xác suất và hiệu quả kinh tế đã được chuẩn hóa của nhân sự tại danh mục $i$.
 
-
+$$ExpectedPerformanceScore_i = Probability_i \times (1 + \widetilde{AverageMargin}_i)$$
 
 #### c) Các siêu tham số vận hành
 
@@ -79,8 +76,8 @@ $$Boost_{idle} = \tanh\left(\frac{IdleHours}{24}\right) \times IdleWeight_{old}$
 
 *Trong đó:*
 
-* $CurrentWorkload$: Số lượng yêu cầu báo giá đang được nhân sự xử lý tại thời điểm tính toán.
-* $IdleHours$: Số giờ rảnh rỗi liên tục của nhân sự tính từ lần cuối cùng được hệ thống phân bổ RFQ. Hàm tang Hyperbolic ($\tanh$) được áp dụng nhằm bão hòa phi tuyến tính thời gian nhàn rỗi về dải $[0, 1)$, ngăn chặn việc bùng nổ điểm số khi nhân sự nghỉ phép hoặc không nhận đơn kéo dài. Phép chia cho $24$ đóng vai trò quy chuẩn hóa đơn vị (Unit Scaling) theo chu kỳ ngày để đạt trạng thái hội tụ mịn màng nhất.
+* $CurrentWorkload`: Số lượng yêu cầu báo giá đang được nhân sự xử lý tại thời điểm tính toán.
+* $IdleHours`: Số giờ rảnh rỗi liên tục của nhân sự tính từ lần cuối cùng được hệ thống phân bổ RFQ. Hàm tang Hyperbolic ($\tanh$) được áp dụng nhằm bão hòa phi tuyến tính thời gian nhàn rỗi về dải $[0, 1)$, ngăn chặn việc bùng nổ điểm số khi nhân sự nghỉ phép hoặc không nhận đơn kéo dài. Phép chia cho $24$ đóng vai trò quy chuẩn hóa đơn vị (Unit Scaling) theo chu kỳ ngày để đạt trạng thái hội tụ mịn màng nhất.
 * $k_{old}$: Siêu tham số điều chỉnh tải công việc hiện tại.
 * $IdleWeight_{old}$: Siêu tham số ưu tiên thời gian nhàn rỗi hiện tại.
 
@@ -89,7 +86,6 @@ $$Boost_{idle} = \tanh\left(\frac{IdleHours}{24}\right) \times IdleWeight_{old}$
 Chuẩn hóa $FinalScore$ thông qua hàm kích hoạt Sigmoid nhằm thiết lập dự báo xác suất báo giá được khách hàng chấp nhận $\hat{y} \in (0, 1)$ phục vụ pha học trực tuyến.
 
 $$\hat{y} = \frac{1}{1 + e^{-FinalScore}}$$
-
 
 *(Với $\hat{y}$ là giá trị xác suất chốt báo giá thành công do AI dự báo và $e$ là hằng số Euler).*
 
@@ -114,38 +110,38 @@ $$L = - \left[ y \cdot \ln(\hat{y}) + (1 - y) \cdot \ln(1 - \hat{y}) \right]$$
 Hồ sơ năng lực của nhân sự tại danh mục $i$ được tái đánh giá dựa trên kết quả phản hồi thực tế của báo giá theo luật cập nhật logic sau:
 
 * **Trường hợp báo giá được khách hàng chấp nhận ($y = 1$):**
-Hệ thống tiến hành tính toán Biên lợi nhuận thực tế ($Margin_{Q, i}$) của báo giá $Q$ tại danh mục $i$:
+Hệ thống tiến hành tính toán Biên lợi nhuận thực tế ($Margin_{Q, i}$) của báo giá $Q$ tại danh mục $i$ dựa trên tỷ suất sinh lời vượt sàn (Markup):
 
-$$Margin_{Q, i} = \frac{\sum_{g=1}^{m} (QuotedPrice_g \times Quantity_g) - \sum_{g=1}^{m} (BasePrice_g \times Quantity_g)}{\sum_{g=1}^{m} (BasePrice_g \times Quantity_g)}$$
-
-
+$$Margin_{Q, i}^{thô} = \frac{\sum_{g=1}^{m} (QuotedPrice_g \times Quantity_g) - \sum_{g=1}^{m} (BasePrice_g \times Quantity_g)}{\sum_{g=1}^{m} (BasePrice_g \times Quantity_g)}$$
 
 *(Trong đó: $m$ là số lượng mặt hàng thuộc danh mục $i$ trong báo giá $Q$; $QuotedPrice_g$ là đơn giá bán thực tế chốt với khách hàng).*
-Sau đó, cập nhật dữ liệu tích lũy chuyên môn:
+
+Để bảo vệ mô hình trực tuyến khỏi hiện tượng bùng nổ cục bộ khi nhân sự chốt được các đơn hàng siêu lợi nhuận (Markup vượt quá 100% giá vốn), hoặc khi hệ thống tiếp nhận các sai lệch đơn vị đo lường thô, một bộ gác cổng dữ liệu phi tuyến (Data Sanitization Guard) được thiết lập để chuẩn hóa biên độ của biến số trước khi đưa vào bộ nhớ tích lũy:
+
+$$\widetilde{Margin}_{Q, i} = \begin{cases} \frac{Margin_{Q, i}^{thô}}{100} & \text{nếu } 1.0 < Margin_{Q, i}^{thô} \le 100.0 \\ 0.3 & \text{nếu } Margin_{Q, i}^{thô} > 100.0 \lor Margin_{Q, i}^{thô} < 0 \\ Margin_{Q, i}^{thô} & \text{nếu } 0 \le Margin_{Q, i}^{thô} \le 1.0 \end{cases}$$
+
+*(Với mốc $0.3$ là hằng số thiết lập an toàn mặc định ứng với biên lợi nhuận trung bình ngành đạt 30%).*
+
+Sau đó, tiến hành cập nhật dữ liệu tích lũy chuyên môn:
 
 $$SuccessCount_i = SuccessCount_i + 1$$
 
-
-$$TotalMarginAccumulated_i = TotalMarginAccumulated_i + Margin_{Q, i}$$
-
+$$TotalMarginAccumulated_i = TotalMarginAccumulated_i + \widetilde{Margin}_{Q, i}$$
 
 * **Trường hợp báo giá bị khách hàng từ chối ($y = 0$):**
 Biên lợi nhuận thực tế của giao dịch không được thiết lập. Hệ thống giữ nguyên chỉ số lợi nhuận tích lũy và chỉ cập nhật tần suất thất bại của nhân sự tại danh mục $i$:
 
 $$FailureCount_i = FailureCount_i + 1$$
 
-
-
 #### c) Cập nhật siêu tham số
 
-Hệ thống điều chỉnh các siêu tham số vận hành toàn cục dựa trên nguyên lý toán học của Vector Gradient (tập hợp các đạo hàm riêng đa biến). Tiến trình lan truyền ngược thực hiện tính toán giá trị cập nhật thô ($\Delta k$ và $\Delta IdleWeight$) cho từng chu kỳ:
+Hệ thống điều chỉnh các siêu tham số vận hành toàn cục dựa trên nguyên lý toán học của Vector Gradient (tập hợp các đạo hàm riêng đa biến để tìm hướng dốc cực tiểu). Tiến trình lan truyền ngược thực hiện tính toán giá trị biến thiên Gradient thô ($\Delta k$ và $\Delta IdleWeight$) cho từng chu kỳ dựa trên đạo hàm riêng của hàm mục tiêu theo từng siêu tham số:
 
 $$\Delta k = (y - \hat{y}) \cdot \left[ -AggregatedSkillScore \cdot Penalty_{workload} \cdot \ln(CurrentWorkload + 1) \right]$$
 
-$$\Delta IdleWeight = (y - \hat{y}) \cdot \left[ \left(1 - \tanh^2\left(\frac{IdleHours}{24}\right)\right) \cdot \frac{1}{24} \right]$$
+$$\Delta IdleWeight = (y - \hat{y}) \cdot \tanh\left(\frac{IdleHours}{24}\right)$$
 
-Luật cập nhật chính thức tích hợp các toán tử điều hướng và kìm hãm biên độ bước nhảy được xác định như sau:
-
+Luật cập nhật chính thức tích hợp các toán tử điều hướng, tốc độ học và cơ chế kìm hãm biên độ bước nhảy được xác định nhất quán như sau:
 
 $$k_{new} = \max\left(0.0,\ k_{old} + \alpha \cdot \text{clip}(\Delta k, -1.0, 1.0)\right)$$
 
@@ -161,14 +157,11 @@ Do đặc thù luồng dữ liệu RFQ trong môi trường B2B có thể xuất
 
 $$\text{clip}(x, -1.0, 1.0) = \begin{cases} -1.0 & \text{nếu } x < -1.0 \\ 1.0 & \text{nếu } x > 1.0 \\ x & \text{nếu } -1.0 \le x \le 1.0 \end{cases}$$
 
-
-
 Cơ chế này chặn đứng rủi ro bùng nổ Gradient (Gradient Explosion) khi các giá trị đặc trưng đầu vào tăng trưởng lớn. Nó bắt buộc AI chỉ được thực hiện những bước đi ngắn và mịn màng, giúp quỹ đạo tối ưu hội tụ ổn định thay vì nhảy vọt một cách hỗn loạn qua điểm cực trị.
+
 * **Hàm hình chiếu chặn dưới ($\max$):** Áp đặt điều kiện biên nghiêm ngặt nhằm bảo toàn tính logic nghiệp vụ của hệ thống:
 
 $$\max(0.0, \theta_{new}) = \begin{cases} 0.0 & \text{nếu } \theta_{new} < 0.0 \\ \theta_{new} & \text{nếu } \theta_{new} \ge 0.0 \end{cases}$$
-
-
 
 Phép toán này triệt tiêu hoàn toàn nguy cơ đảo ngược nghiệm toán học (ngăn không cho hằng số $k$ và $IdleWeight$ rơi vào miền số âm). Từ đó, bảo vệ mô hình khỏi các trạng thái biến tướng sai lệch (như hệ số trừng phạt tải trọng chuyển dịch thành khuyến khích quá tải, hoặc trọng số nhàn rỗi biến đổi thành trừng phạt nhân sự đang chờ việc).
 
@@ -178,17 +171,15 @@ Phép toán này triệt tiêu hoàn toàn nguy cơ đảo ngược nghiệm to�
 
 #### a) Đạo hàm theo siêu tham số tải trọng ($k$)
 
-Mục này khai triển chứng minh giải tích cho Thành phần B trong luật cập nhật hệ số trừng phạt $k$. Tiến hành lấy đạo hàm riêng của hàm số $FinalScore$ (định nghĩa tại Mục 5.1.2.a) theo biến số $k_{old}$:
+Mục này khai triển chứng minh giải tích cho Thành phần toán học trong luật cập nhật hệ số trừng phạt $k$. Tiến hành lấy đạo hàm riêng của hàm số $FinalScore$ (định nghĩa tại Mục 5.1.2.a) theo biến số $k_{old}$:
 
 $$\frac{\partial FinalScore}{\partial k_{old}} = \frac{\partial}{\partial k_{old}} \left[ AggregatedSkillScore \cdot (CurrentWorkload + 1)^{-k_{old}} + Boost_{idle} \right]$$
 
-Do thành phần bổ trợ thời gian nhàn rỗi ($Boost_{idle}$) hoàn toàn độc lập với biến số $k_{old}$, đạo hàm riêng của cụm này bằng 0. Áp dụng quy tắc đạo hàm hàm số mũ dạng $(a^{-x})' = -a^{-x} \cdot \ln(a)$ với $a = (CurrentWorkload + 1)$ và biến số $x = k_{old}$:
-
+Do thành phần bổ trợ thời gian nhàn rỗi ($Boost_{idle}$) hoàn toàn độc lập với biến số $k_{old}$, đạo hàm riêng của cụm này bằng 0. Áp dụng quy tắc đạo hàm hàm số mũ dạng $(a^{-x})' = -a^{-x} \cdot \ln(a)$ với $a = (CurrentWorkload + 1)$ and biến số $x = k_{old}$:
 
 $$\frac{\partial FinalScore}{\partial k_{old}} = AggregatedSkillScore \cdot \left[ -(CurrentWorkload + 1)^{-k_{old}} \cdot \ln(CurrentWorkload + 1) \right]$$
 
 Thu gọn thành phần cấu trúc mũ về dạng hàm gốc $Penalty_{workload}$:
-
 
 $$\frac{\partial FinalScore}{\partial k_{old}} = -AggregatedSkillScore \cdot Penalty_{workload} \cdot \ln(CurrentWorkload + 1)$$
 
@@ -200,17 +191,15 @@ Tiến hành lấy đạo hàm riêng của hàm số $FinalScore$ theo biến s
 
 $$\frac{\partial FinalScore}{\partial IdleWeight_{old}} = \frac{\partial}{\partial IdleWeight_{old}} \left[ AggregatedSkillScore \cdot Penalty_{workload} + \tanh\left(\frac{IdleHours}{24}\right) \times IdleWeight_{old} \right]$$
 
-Do thành phần năng lực và tải trọng đóng vai trò là hằng số đối với biến $IdleWeight_{old}$, đạo hàm riêng của cụm này bị triệt tiêu. Áp dụng quy tắc đạo hàm hàm bậc nhất tuyến tính:
-
+Do thành phần năng lực và tải trọng đóng vai trò là hằng số đối với biến $IdleWeight_{old}$, đạo hàm riêng của cụm này bị triệt tiêu. Áp dụng quy tắc đạo hàm hàm bậc nhất tuyến tính dạng $f(x) = A \cdot x \implies f'(x) = A$ với hằng số $A = \tanh\left(\frac{IdleHours}{24}\right)$ và biến số $x = IdleWeight_{old}$:
 
 $$\frac{\partial FinalScore}{\partial IdleWeight_{old}} = \tanh\left(\frac{IdleHours}{24}\right)$$
 
-**Ý nghĩa học máy:** Việc bọc hàm $\tanh$ giúp hướng điều chỉnh của siêu tham số thưởng luôn tỷ lệ thuận với mức độ nhàn rỗi nhưng sẽ tiệm cận về trạng thái bão hòa ổn định khi thời gian chờ vượt ngưỡng chu kỳ làm việc thực tế của doanh nghiệp B2B.
+**Ý nghĩa học máy:** Việc lấy đạo hàm riêng theo chính siêu tham số giúp hướng điều chỉnh của véc-tơ Gradient luôn tỷ lệ thuận với mức độ nhàn rỗi thực tế của nhân sự ($\tanh$). Nhân sự rảnh càng lâu, trọng lượng đóng góp của sai số phản hồi vào siêu tham số $IdleWeight$ càng mạnh mẽ, giúp hệ thống tự động bám sát và đưa ra quyết định "bù ga" điều phối chính xác, tránh hiện tượng trơ lì tham số của các công thức lỗi cũ.
 
 #### c) Chứng minh toán học quy trình triệt tiêu Gradient tổng thể
 
 Mục này chứng minh nguồn gốc toán học của Thành phần toán học dùng trong các công thức cập nhật thô tại Mục 5.1.3.c. Áp dụng quy tắc chuỗi toán giải tích đối với hàm hợp để tính đạo hàm riêng của Hàm mất mát ($L$) theo $FinalScore$:
-
 
 $$\frac{\partial L}{\partial FinalScore} = \frac{\partial L}{\partial \hat{y}} \cdot \frac{\partial \hat{y}}{\partial FinalScore}$$
 
@@ -219,22 +208,17 @@ Từ phương trình gốc tại Mục 5.1.3.a: $L = - [y \cdot \ln(\hat{y}) + (
 
 $$\frac{\partial L}{\partial \hat{y}} = - \left[ \frac{y}{\hat{y}} - \frac{1 - y}{1 - \hat{y}} \right] = - \left[ \frac{y(1 - \hat{y}) - \hat{y}(1 - y)}{\hat{y}(1 - \hat{y})} \right] = \frac{\hat{y} - y}{\hat{y}(1 - \hat{y})}$$
 
-
 * **Bước 2: Tính đạo hàm riêng của hàm kích hoạt Sigmoid theo biến $FinalScore$**
 Từ phương trình hàm kích hoạt: $\hat{y} = \frac{1}{1 + e^{-FinalScore}}$. Đạo hàm riêng biểu diễn qua chính hàm gốc $\hat{y}$:
 
 $$\frac{\partial \hat{y}}{\partial FinalScore} = \hat{y}(1 - \hat{y})$$
-
 
 * **Bước 3: Tổng hợp và thực hiện phép triệt tiêu cơ số**
 Thay thế kết quả từ Bước 1 và Bước 2 vào phương trình quy tắc chuỗi ban đầu:
 
 $$\frac{\partial L}{\partial FinalScore} = \left[ \frac{\hat{y} - y}{\hat{y}(1 - \hat{y})} \right] \cdot \left[ \hat{y}(1 - \hat{y}) \right]$$
 
-
-
 Triệt tiêu đại lượng $\hat{y}(1 - \hat{y})$ đồng nhất giữa tử số và mẫu số:
-
 
 $$\frac{\partial L}{\partial FinalScore} = \hat{y} - y = - (y - \hat{y})$$
 
